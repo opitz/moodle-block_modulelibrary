@@ -151,7 +151,7 @@ console.log("Module copied successfully");
                 notification.addNotification({message: 'Module copied successfully', type: 'success'});
                 setTimeout(function() { window.location.reload(); }, 1200);
             } else {
-alert("ouch...");
+//alert("ouch...");
 console.log(response);
                 notification.exception(new Error('Copy failed'));
             }

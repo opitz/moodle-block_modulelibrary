@@ -278,23 +278,7 @@ class externalstuff extends external_api {
             // Restore the backup immediately.
             $rc = new restore_controller($backupid, $targetcourseid,
                 backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id, backup::TARGET_CURRENT_ADDING);
-
-            // Make sure that the restore_general_groups setting is always enabled when duplicating an activity.
-            $plan = $rc->get_plan();
-            $groupsetting = $plan->get_setting('groups');
-            if (empty($groupsetting->get_value())) {
-                $groupsetting->set_value(true);
-            }
-
-            $cmcontext = context_module::instance($cm->id);
-            if (!$rc->execute_precheck()) {
-                $precheckresults = $rc->get_precheck_results();
-                if (is_array($precheckresults) && !empty($precheckresults['errors'])) {
-                    if (empty($CFG->keeptempdirectoriesonbackup)) {
-                        fulldelete($backupbasepath);
-                    }
-                }
-            }
+            $rc->set_status(backup::STATUS_AWAITING);
 
             try {
                 $rc->execute_plan();
@@ -304,6 +288,7 @@ class externalstuff extends external_api {
 
             // Now a bit hacky part follows - we try to get the cmid of the newly
             // restored copy of the module.
+            $cmcontext = context_module::instance($cm->id);
             $newcmid = null;
             $tasks = $rc->get_plan()->get_tasks();
             foreach ($tasks as $task) {
@@ -328,19 +313,22 @@ class externalstuff extends external_api {
 //                $newcm = get_coursemodule_from_id($type, $newcmid);
                 $params = ['course' => $targetcourseid, 'section' => $targetsection];
                 $section = $DB->get_record('course_sections', $params);
-//                moveto_module($newcm, $section);
+                moveto_module($newcm, $section);
 
                 // Update calendar events with the duplicated module.
                 // The following line is to be removed in MDL-58906.
                 course_module_update_calendar_events($newcm->modname, null, $newcm);
 
                 // Trigger course module created event. We can trigger the event only if we know the newcmid.
-                $newcm = get_fast_modinfo($course)->get_cm($newcmid);
+                $newcm = get_fast_modinfo($targetcourseid)->get_cm($newcmid);
                 $event = \core\event\course_module_created::create_from_cm($newcm);
                 $event->trigger();
             }
 
             $CFG->keeptempdirectoriesonbackup = $keeptempdirectoriesonbackup;
+
+//            $targetcourse = get_course($targetcourseid);
+//            move_section_to($targetcourse, $newcm->sectionnum, $targetsection);
 
             // Rebuild the cache for that course so the changes become effective.
             rebuild_course_cache($courseid, true);
