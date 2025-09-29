@@ -3,6 +3,7 @@ namespace block_modulelibrary;
 
 defined('MOODLE_INTERNAL') || die();
 
+use context_module;
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_value;
@@ -10,6 +11,7 @@ use core_external\external_single_structure;
 use core_external\external_multiple_structure;
 
 use backup_controller;
+use Exception;
 use restore_controller;
 use backup;
 
@@ -145,7 +147,210 @@ class externalstuff extends external_api {
         ]);
     }
 
+    function install_module(int $sectionid, int $cmid, string $type):string {
+        global $CFG, $DB, $USER;
+
+        require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
+        require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
+        require_once($CFG->libdir . '/filelib.php');
+
+        // Get course from sectionid.
+        $courseid = $DB->get_field('course_sections', 'course', array('id' => $sectionid));
+        $course = $DB->get_record('course', array('id' => $courseid));
+        $keeptempdirectoriesonbackup = $CFG->keeptempdirectoriesonbackup;
+        $CFG->keeptempdirectoriesonbackup = true;
+
+        // Backup the activity.
+        $bc = new backup_controller(backup::TYPE_1ACTIVITY, $cmid, backup::FORMAT_MOODLE,
+            backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id);
+
+        $backupid       = $bc->get_backupid();
+        $backupbasepath = $bc->get_plan()->get_basepath();
+
+        $bc->execute_plan();
+        $bc->destroy();
+
+        // Restore the backup immediately.
+        $rc = new restore_controller($backupid, $course->id,
+            backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id, backup::TARGET_CURRENT_ADDING);
+
+        // Make sure that the restore_general_groups setting is always enabled when duplicating an activity.
+        $plan = $rc->get_plan();
+        $groupsetting = $plan->get_setting('groups');
+        if (empty($groupsetting->get_value())) {
+            $groupsetting->set_value(true);
+        }
+
+        $cmcontext = context_module::instance($cmid);
+        if (!$rc->execute_precheck()) {
+            $precheckresults = $rc->get_precheck_results();
+            if (is_array($precheckresults) && !empty($precheckresults['errors'])) {
+                if (empty($CFG->keeptempdirectoriesonbackup)) {
+                    fulldelete($backupbasepath);
+                }
+            }
+        }
+
+        try {
+            $rc->execute_plan();
+        } catch (Exception $e) {
+            throw new Exception($e->getMessage());
+        }
+
+        // Now a bit hacky part follows - we try to get the cmid of the newly
+        // restored copy of the module.
+        $newcmid = null;
+        $tasks = $rc->get_plan()->get_tasks();
+        foreach ($tasks as $task) {
+            if (is_subclass_of($task, 'restore_activity_task')) {
+                if ($task->get_old_contextid() == $cmcontext->id) {
+                    $newcmid = $task->get_moduleid();
+                    break;
+                }
+            }
+        }
+
+        $rc->destroy();
+
+        if (empty($CFG->keeptempdirectoriesonbackup)) {
+            fulldelete($backupbasepath);
+        }
+
+        if ($newcmid) {
+            // Move the module to the destination section.
+            $newcm = get_coursemodule_from_id($type, $newcmid);
+            $section = $DB->get_record('course_sections', array('id' => $sectionid));
+            moveto_module($newcm, $section);
+
+            // Update calendar events with the duplicated module.
+            // The following line is to be removed in MDL-58906.
+            course_module_update_calendar_events($newcm->modname, null, $newcm);
+
+            // Trigger course module created event. We can trigger the event only if we know the newcmid.
+            $newcm = get_fast_modinfo($course)->get_cm($newcmid);
+            $event = \core\event\course_module_created::create_from_cm($newcm);
+            $event->trigger();
+        }
+
+        $CFG->keeptempdirectoriesonbackup = $keeptempdirectoriesonbackup;
+
+        // Rebuild the cache for that course so the changes become effective.
+        rebuild_course_cache($courseid, true);
+
+        return get_string('installed', 'block_modlib', ucfirst($type));
+    }
+
     public static function copy_activity($sourcecmid, $targetcourseid, $targetsection) {
+        global $DB, $CFG, $USER;
+
+        $params = self::validate_parameters(self::copy_activity_parameters(), [
+            'cmid' => $sourcecmid,
+            'targetcourseid' => $targetcourseid,
+            'targetsection' => $targetsection
+        ]);
+
+        // Basic checks
+        $cm = get_coursemodule_from_id(null, $params['cmid'], 0, false, MUST_EXIST);
+        $sourcecourse = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
+        $targetcourse = $DB->get_record('course', ['id' => $params['targetcourseid']], '*', MUST_EXIST);
+
+        require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
+        require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
+        require_once($CFG->libdir . '/filelib.php');
+
+        try {
+            // Get course from sectionid.
+            $courseid = $DB->get_field('course_sections', 'course', array('id' => $sourcecmid));
+            $course = $DB->get_record('course', array('id' => $courseid));
+            $keeptempdirectoriesonbackup = $CFG->keeptempdirectoriesonbackup;
+            $CFG->keeptempdirectoriesonbackup = true;
+
+            // Backup the activity.
+            $bc = new backup_controller(backup::TYPE_1ACTIVITY, $cm->id, backup::FORMAT_MOODLE,
+                backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id);
+
+            $backupid       = $bc->get_backupid();
+            $backupbasepath = $bc->get_plan()->get_basepath();
+
+            $bc->execute_plan();
+            $bc->destroy();
+
+            // Restore the backup immediately.
+            $rc = new restore_controller($backupid, $targetcourseid,
+                backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id, backup::TARGET_CURRENT_ADDING);
+
+            // Make sure that the restore_general_groups setting is always enabled when duplicating an activity.
+            $plan = $rc->get_plan();
+            $groupsetting = $plan->get_setting('groups');
+            if (empty($groupsetting->get_value())) {
+                $groupsetting->set_value(true);
+            }
+
+            $cmcontext = context_module::instance($cm->id);
+            if (!$rc->execute_precheck()) {
+                $precheckresults = $rc->get_precheck_results();
+                if (is_array($precheckresults) && !empty($precheckresults['errors'])) {
+                    if (empty($CFG->keeptempdirectoriesonbackup)) {
+                        fulldelete($backupbasepath);
+                    }
+                }
+            }
+
+            try {
+                $rc->execute_plan();
+            } catch (Exception $e) {
+                throw new Exception($e->getMessage());
+            }
+
+            // Now a bit hacky part follows - we try to get the cmid of the newly
+            // restored copy of the module.
+            $newcmid = null;
+            $tasks = $rc->get_plan()->get_tasks();
+            foreach ($tasks as $task) {
+                if (is_subclass_of($task, 'restore_activity_task')) {
+                    if ($task->get_old_contextid() == $cmcontext->id) {
+                        $newcmid = $task->get_moduleid();
+                        break;
+                    }
+                }
+            }
+
+            $rc->destroy();
+
+            if (empty($CFG->keeptempdirectoriesonbackup)) {
+                fulldelete($backupbasepath);
+            }
+
+            if ($newcmid) {
+                $newcm = get_coursemodule_from_id(null, $newcmid, 0, true, MUST_EXIST);
+//                $type = $newcm->modname;
+                // Move the module to the destination section.
+//                $newcm = get_coursemodule_from_id($type, $newcmid);
+                $params = ['course' => $targetcourseid, 'section' => $targetsection];
+                $section = $DB->get_record('course_sections', $params);
+//                moveto_module($newcm, $section);
+
+                // Update calendar events with the duplicated module.
+                // The following line is to be removed in MDL-58906.
+                course_module_update_calendar_events($newcm->modname, null, $newcm);
+
+                // Trigger course module created event. We can trigger the event only if we know the newcmid.
+                $newcm = get_fast_modinfo($course)->get_cm($newcmid);
+                $event = \core\event\course_module_created::create_from_cm($newcm);
+                $event->trigger();
+            }
+
+            $CFG->keeptempdirectoriesonbackup = $keeptempdirectoriesonbackup;
+
+            // Rebuild the cache for that course so the changes become effective.
+            rebuild_course_cache($courseid, true);
+
+            return ['status' => true, 'message' => 'Activity restored into target course (experimental).'];
+        } catch (Exception $e) {
+            return ['status' => false, 'message' => 'Backup/restore failed: ' . $e->getMessage()];
+        }
+    }
+    public static function copy_activity0($sourcecmid, $targetcourseid, $targetsection) {
         global $DB, $CFG, $USER;
 
         $params = self::validate_parameters(self::copy_activity_parameters(), [
@@ -164,26 +369,38 @@ class externalstuff extends external_api {
         try {
             // Create backup controller for the single activity; produce a file.
             $bc = new backup_controller(
-                backup::TYPE_1ACTIVITY, // backup a single activity
-                $cm->id,                // course module id
-                backup::FORMAT_MOODLE,  // backup format
-                backup::INTERACTIVE_NO, // non-interactive
-                backup::MODE_IMPORT,    // mode
-                $USER->id               // user id
+                backup::TYPE_1ACTIVITY,
+                $cm->id,
+                backup::FORMAT_MOODLE,
+                backup::INTERACTIVE_NO,
+                backup::MODE_IMPORT,
+                $USER->id
             );
 
-            // Exclude user info if needed
-            $bc->get_plan()->get_setting('userinfo')->set_value(false);
+            $plan = $bc->get_plan();
+            if ($plan->setting_exists('userinfo')) {
+                // Exclude user info if needed
+                $plan->get_setting('userinfo')->set_value(false);
+            }
 
             // Execute backup
             $bc->execute_plan();
 
             // Get results (file)
-            $results = $bc->get_results();
-            $backupfile = $results['backup_destination'];
+//            $results = $bc->get_results();
+//            $backupfile = $results['backup_destination'];
+//            $backupfile = $plan->get('filename');
+            // Get the backup file path for single activity
+            $backupfile = $bc->get_results()['backup_destination'] ?? null;
+
+
+
+            if (!file_exists($backupfile)) {
+                throw new \moodle_exception('Backup file not found: ' . $backupfile);
+            }
 
             // Destroy backup controller (does not delete file)
-            $bc->destroy();
+//            $bc->destroy();
 
             // --- Restore into target course ---
             $rc = new restore_controller(
@@ -202,15 +419,15 @@ class externalstuff extends external_api {
             // You can inspect mappings via $rc->get_mapping() or restore mappings table if needed.
             $rc->destroy();
 
-            return ['success' => true, 'message' => 'Activity restored into target course (experimental).'];
+            return ['status' => true, 'message' => 'Activity restored into target course (experimental).'];
         } catch (\Exception $e) {
-            return ['success' => false, 'message' => 'Backup/restore failed: ' . $e->getMessage()];
+            return ['status' => false, 'message' => 'Backup/restore failed: ' . $e->getMessage()];
         }
     }
 
     public static function copy_activity_returns() {
         return new external_single_structure([
-            'success' => new external_value(PARAM_BOOL, 'Success'),
+            'status' => new external_value(PARAM_BOOL, 'Status'),
             'message' => new external_value(PARAM_TEXT, 'Message'),
         ]);
     }
@@ -232,7 +449,7 @@ class externalstuff extends external_api {
 
     public static function copy_module_returns() {
         return new external_single_structure([
-            'success' => new external_value(PARAM_BOOL, 'Success'),
+            'status' => new external_value(PARAM_BOOL, 'Status'),
             'message' => new external_value(PARAM_TEXT, 'Message'),
         ]);
     }

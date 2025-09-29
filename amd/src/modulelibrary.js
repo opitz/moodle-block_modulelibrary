@@ -147,9 +147,12 @@ define(['jquery', 'core/ajax', 'core/notification'], function($, ajax, notificat
             }
         }])[0].done(function(response) {
             if (response.status) {
+console.log("Module copied successfully");
                 notification.addNotification({message: 'Module copied successfully', type: 'success'});
                 setTimeout(function() { window.location.reload(); }, 1200);
             } else {
+alert("ouch...");
+console.log(response);
                 notification.exception(new Error('Copy failed'));
             }
         }).fail(function(err) {
