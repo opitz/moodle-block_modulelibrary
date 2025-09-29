@@ -269,6 +269,15 @@ class externalstuff extends external_api {
             $bc = new backup_controller(backup::TYPE_1ACTIVITY, $cm->id, backup::FORMAT_MOODLE,
                 backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id);
 
+            // Force exclude user data.
+            $settings = $bc->get_plan()->get_settings();
+            if (isset($settings['users'])) {
+                $settings['users']->set_value(false);
+            }
+            if (isset($settings['userinfo'])) {
+                $settings['userinfo']->set_value(false);
+            }
+
             $backupid       = $bc->get_backupid();
             $backupbasepath = $bc->get_plan()->get_basepath();
 
