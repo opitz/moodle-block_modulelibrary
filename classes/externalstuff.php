@@ -316,10 +316,8 @@ class externalstuff extends external_api {
             }
 
             if ($newcmid) {
-                $newcm = get_coursemodule_from_id(null, $newcmid, 0, true, MUST_EXIST);
-//                $type = $newcm->modname;
                 // Move the module to the destination section.
-//                $newcm = get_coursemodule_from_id($type, $newcmid);
+                $newcm = get_coursemodule_from_id(null, $newcmid, 0, true, MUST_EXIST);
                 $params = ['course' => $targetcourseid, 'section' => $targetsection];
                 $section = $DB->get_record('course_sections', $params);
                 moveto_module($newcm, $section);

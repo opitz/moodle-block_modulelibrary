@@ -1,0 +1,19 @@
+<div class="copy-form-container">
+    <h6>{{#str}} copyassessmentconfirm, block_modulelibrary {{/str}}</h6>
+    <p><strong>{{modulename}}</strong></p>
+
+    <form id="copy-assessment-form">
+        <label for="target-section">
+            {{#str}} selecttargetsection, block_modulelibrary {{/str}}
+        </label>
+        <select id="target-section" required>
+            <option value="0">{{#str}} appendatend, block_modulelibrary {{/str}}</option>
+            {{#sections}}
+                <option value="{{sectionnum}}">{{name}}</option>
+            {{/sections}}
+        </select>
+
+        <button type="submit">{{#str}} confirmcopy, block_modulelibrary {{/str}}</button>
+        <button type="button" id="cancel-copy-btn">{{#str}} cancel, core {{/str}}</button>
+    </form>
+</div>

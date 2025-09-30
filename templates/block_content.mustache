@@ -1,0 +1,21 @@
+<div id="block-modulelibrary">
+    <label for="modulelibrary-course-select">
+        {{#str}} selecttemplatecourse, block_modulelibrary {{/str}}
+    </label>
+
+    <select id="modulelibrary-course-select">
+        <option value="">
+            {{#str}} choosecourse, block_modulelibrary {{/str}}
+        </option>
+        {{#courses}}
+            <option value="{{id}}">{{fullname}}</option>
+        {{/courses}}
+    </select>
+
+    <div id="modulelibrary-loading" style="display:none">
+        {{#str}} loading, block_modulelibrary {{/str}}
+    </div>
+
+    <div id="modulelibrary-modules"></div>
+    <div id="modulelibrary-copy-form"></div>
+</div>

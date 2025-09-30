@@ -2,7 +2,8 @@
  * AMD module for block_modulelibrary
  * @module block_modulelibrary/modulelibrary
  */
-define(['jquery', 'core/ajax', 'core/notification'], function($, ajax, notification) {
+define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
+    function($, ajax, templates, notification) {
 
     /**
      * Selected template module
@@ -107,21 +108,22 @@ define(['jquery', 'core/ajax', 'core/notification'], function($, ajax, notificat
             methodname: 'block_modulelibrary_get_target_course_sections',
             args: { courseid: currentCourseId }
         }])[0].done(function(sections) {
-            let html = '<div class="copy-form-container">';
-            html += '<h6>Copy Template Module</h6>';
-            html += '<p><strong>' + selectedModule.name + '</strong></p>';
-            html += '<form id="copy-assessment-form">';
-            html += '<label for="target-section">Select target section:</label>';
-            html += '<select id="target-section" required>';
-            html += '<option value="0">Append at end</option>';
-            sections.forEach(function(sec) {
-                html += '<option value="' + sec.sectionnum + '">' + sec.name + '</option>';
-            });
-            html += '</select>';
-            html += '<button type="submit">Confirm copy</button>';
-            html += '<button type="button" id="cancel-copy-btn">Cancel</button>';
-            html += '</form></div>';
-            $('#modulelibrary-copy-form').html(html);
+            // Data to pass to the Mustache template
+            const data = {
+                modulename: selectedModule.name,
+                sections: sections
+            };
+
+            templates.render('block_modulelibrary/copy_form', data)
+                .then(function(html, js) {
+                    $('#modulelibrary-copy-form').html(html);
+                    templates.runTemplateJS(js);
+                })
+                .fail(function(err) {
+                    $('#modulelibrary-copy-form').html('<p>Failed to render form</p>');
+                    notification.exception(err);
+                });
+
         }).fail(function(err) {
             $('#modulelibrary-copy-form').html('<p>Failed to load target sections</p>');
             notification.exception(err);
@@ -141,18 +143,15 @@ define(['jquery', 'core/ajax', 'core/notification'], function($, ajax, notificat
         ajax.call([{
             methodname: 'block_modulelibrary_copy_activity',
             args: {
-                cmid: parseInt(selectedModule.cmid, 10), // matches PHP external function param
+                cmid: parseInt(selectedModule.cmid, 10),
                 targetcourseid: currentCourseId,
                 targetsection: targetsection
             }
         }])[0].done(function(response) {
             if (response.status) {
-console.log("Module copied successfully");
                 notification.addNotification({message: 'Module copied successfully', type: 'success'});
                 setTimeout(function() { window.location.reload(); }, 1200);
             } else {
-//alert("ouch...");
-console.log(response);
                 notification.exception(new Error('Copy failed'));
             }
         }).fail(function(err) {

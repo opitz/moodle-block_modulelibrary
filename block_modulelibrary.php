@@ -3,21 +3,40 @@ defined('MOODLE_INTERNAL') || die();
 
 class block_modulelibrary extends block_base {
 
-    public function init() {
+    /**
+     * Initialisation
+     *
+     * @return void
+     */
+    public function init(): void {
         $this->title = get_string('pluginname', 'block_modulelibrary');
     }
 
-    public function applicable_formats() {
+    /**
+     * Applicable formats
+     *
+     * @return array true[]
+     */
+    public function applicable_formats(): array {
         return ['course-view' => true];
     }
 
     /**
      * Block has configuration
+     *
+     * @return bool
      */
-    public function has_config() {
+    public function has_config(): bool {
         return true;
     }
 
+    /**
+     * Get the block content.
+     *
+     * @return stdClass|null
+     * @throws \core\exception\moodle_exception
+     * @throws dml_exception
+     */
     public function get_content() {
         global $PAGE, $COURSE, $OUTPUT;
 
@@ -47,19 +66,11 @@ class block_modulelibrary extends block_base {
             $courses = [];
         }
 
-        // Render HTML (simple)
-        $html = html_writer::start_tag('div', ['id' => 'block-modulelibrary']);
-        $html .= html_writer::tag('label', get_string('selecttemplatecourse', 'block_modulelibrary'), ['for'=>'modulelibrary-course-select']);
-        $html .= html_writer::start_tag('select', ['id'=>'modulelibrary-course-select']);
-        $html .= html_writer::tag('option', get_string('choosecourse', 'block_modulelibrary'), ['value'=>'']);
-        foreach ($courses as $c) {
-            $html .= html_writer::tag('option', $c['fullname'], ['value'=>$c['id']]);
-        }
-        $html .= html_writer::end_tag('select');
-        $html .= html_writer::tag('div', '<div id="modulelibrary-loading" style="display:none">' . get_string('loading', 'block_modulelibrary') . '</div><div id="modulelibrary-modules"></div><div id="modulelibrary-copy-form"></div>', []);
-        $html .= html_writer::end_tag('div');
-
-        $this->content->text = $html;
+        // Render using Mustache template.
+        $data = [
+            'courses' => $courses,
+        ];
+        $this->content->text = $OUTPUT->render_from_template('block_modulelibrary/block_content', $data);
 
         // Provide current course id to JS.
         $PAGE->requires->js_call_amd('block_modulelibrary/modulelibrary', 'init', [
