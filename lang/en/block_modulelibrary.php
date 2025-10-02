@@ -2,6 +2,7 @@
 $string['appendatend'] = 'Append at end';
 $string['confirmcopy'] = 'Confirm copy';
 $string['choosecourse'] = 'Choose a course...';
+$string['copymodule'] = 'Copy';
 $string['copyassessmentconfirm'] = 'Copy assessment? This will copy structure only, without user data.';
 $string['copymoduleconfirm'] = 'Copy whole module? This will copy structure only, without user data.';
 $string['loading'] = 'Loading…';

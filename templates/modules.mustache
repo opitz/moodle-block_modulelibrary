@@ -1,0 +1,29 @@
+<div class="modulelibrary-course">
+    <h4>{{title}}</h4>
+
+    {{#sections}}
+        <div class="modulelibrary-section mb-3">
+            <h5>
+                {{#str}} section, core {{/str}} {{section}}
+                {{#name}} - {{name}}{{/name}}
+            </h5>
+            <ul class="list-group">
+                {{#modules}}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>{{name}}</span>
+                        <button type="button"
+                                class="btn btn-sm btn-primary select-template-module-btn"
+                                data-cmid="{{cmid}}"
+                                data-name="{{name}}">
+                            {{#str}} copymodule, block_modulelibrary {{/str}}
+                        </button>
+                    </li>
+                {{/modules}}
+            </ul>
+        </div>
+    {{/sections}}
+
+    {{^sections}}
+        <p>{{#str}} nomodulesfound, block_modulelibrary {{/str}}</p>
+    {{/sections}}
+</div>

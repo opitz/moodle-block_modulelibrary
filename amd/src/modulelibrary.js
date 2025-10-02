@@ -63,33 +63,26 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
      * @param {number} courseId
      */
     function loadTemplateCourseSections(courseId) {
-        $('#modulelibrary-loading').show();
-        $('#modulelibrary-modules').empty();
-        $('#modulelibrary-copy-form').empty();
+        const loading = document.querySelector('#modulelibrary-loading');
+        const container = document.querySelector('#modulelibrary-modules');
+        const formContainer = document.querySelector('#modulelibrary-copy-form');
+
+        loading.style.display = 'block'; // Show a spinner.
+        container.innerHTML = '';
+        formContainer.innerHTML = '';
 
         ajax.call([{
             methodname: 'block_modulelibrary_get_template_course_modules',
             args: { courseid: parseInt(courseId, 10) }
         }])[0].done(function(response) {
-            $('#modulelibrary-loading').hide();
-            const data = response;
-            if (!data || !data.sections?.length) {
-                $('#modulelibrary-modules').html('<p>No modules found in this course.</p>');
-                return;
-            }
-            let html = '<h4>' + data.title + '</h4>';
-            data.sections.forEach(function(section) {
-                html += '<h5>Section ' + section.section + ' - ' + (section.name || '') + '</h5><ul>';
-                section.modules.forEach(function(m) {
-                    html += '<li>' + m.modname + ': ' + m.name +
-                        ' <button type="button" class="select-template-module-btn" data-cmid="' + m.cmid +
-                        '" data-name="' + m.name + '">Copy this module</button>' + '</li>';
-                });
-                html += '</ul>';
-            });
-            $('#modulelibrary-modules').html(html);
+            loading.style.display = 'none'; // Hide the spinner.
+            templates.render('block_modulelibrary/modules', response)
+                .then((html, js) => {
+                    templates.appendNodeContents(container, html, js);
+                })
+                .catch(notification.exception);
         }).fail(function(err) {
-            $('#modulelibrary-loading').hide();
+            loading.style.display = 'none'; // Hide the spinner.
             notification.exception(err);
         });
     }
@@ -159,5 +152,5 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
         });
     }
 
-    return { init: init };
+    return {init: init};
 });
