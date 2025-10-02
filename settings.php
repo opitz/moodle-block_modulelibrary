@@ -17,22 +17,23 @@
 /**
  * Settings for block_modulelibrary
  *
- * @package    block_modulelibrary
- * @copyright  2024 Your Name
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package     block_modulelibrary
+ * @copyright   2025 onwards UCL
+ * @author      Matthias Opitz <m.opitz@ucl.ac.uk>
+ * @license     https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
 if ($ADMIN->fulltree) {
-    // Get all course categories for the dropdown
+    // Get all course categories for the dropdown.
     $categories = core_course_category::make_categories_list();
 
     $settings->add(new admin_setting_configselect(
         'block_modulelibrary/templatecategory',
         get_string('templatecategory', 'block_modulelibrary'),
         get_string('templatecategory_desc', 'block_modulelibrary'),
-        1, // Default to category 1
+        1, // Default to category 1.
         $categories
     ));
 }

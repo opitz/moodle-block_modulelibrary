@@ -1,7 +1,20 @@
 <?php
-namespace block_modulelibrary;
+// This file is part of Moodle - https://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-defined('MOODLE_INTERNAL') || die();
+namespace block_modulelibrary;
 
 use context_module;
 use core_external\external_api;
@@ -15,19 +28,34 @@ use Exception;
 use restore_controller;
 use backup;
 
+/**
+ * External API functions for the Module Library block.
+ *
+ * @package   block_modulelibrary
+ * @category  external
+ * @copyright 2025 UCL
+ * @license   https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 class externalstuff extends external_api {
 
-    public static function get_template_course_modules_parameters() {
+    /**
+     * Returns parameters for get_template_course_modules().
+     *
+     * @return external_function_parameters
+     */
+    public static function get_template_course_modules_parameters(): external_function_parameters {
         return new external_function_parameters([
             'courseid' => new external_value(PARAM_INT, 'Course id'),
         ]);
     }
 
     /**
-     * Return sections and modules of a course (template).
-     * Format: ['title'=>..., 'sections' => [ ['section'=>n,'name'=>..., 'modules'=>[...]], ... ]]
+     * Returns sections and modules of a template course.
+     *
+     * @param int $courseid
+     * @return array ['title'=>string, 'sections'=>array]
      */
-    public static function get_template_course_modules($courseid) {
+    public static function get_template_course_modules(int $courseid): array {
         global $DB;
 
         $params = self::validate_parameters(self::get_template_course_modules_parameters(),
@@ -64,12 +92,17 @@ class externalstuff extends external_api {
         }
 
         return [
-            'title' => $course->fullname, // just use raw string; do not call format_string()
+            'title' => $course->fullname,
             'sections' => $sections,
         ];
     }
 
-    public static function get_template_course_modules_returns() {
+    /**
+     * Returns the structure of get_template_course_modules() return values.
+     *
+     * @return external_single_structure
+     */
+    public static function get_template_course_modules_returns(): external_single_structure {
         return new external_single_structure([
             'title' => new external_value(PARAM_TEXT, 'Course title'),
             'sections' => new external_multiple_structure(
@@ -89,17 +122,24 @@ class externalstuff extends external_api {
         ]);
     }
 
-    public static function get_target_modules_for_copy_parameters() {
+    /**
+     * Parameters for get_target_modules_for_copy().
+     *
+     * @return external_function_parameters
+     */
+    public static function get_target_modules_for_copy_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'courseid' => new external_value(PARAM_INT, 'Course ID')
+            'courseid' => new external_value(PARAM_INT, 'Course ID'),
         ]);
     }
 
     /**
-     * Returns a flat list of modules in the target course including section numbers.
-     * Format: [ ['id'=>cmid,'section'=>n,'modname'=>'forum','name'=>'Announcements'], ... ]
+     * Returns a flat list of modules in a course.
+     *
+     * @param int $courseid
+     * @return array
      */
-    public static function get_target_modules_for_copy($courseid) {
+    public static function get_target_modules_for_copy(int $courseid): array {
         global $DB;
 
         $params = self::validate_parameters(self::get_target_modules_for_copy_parameters(), ['courseid' => $courseid]);
@@ -115,31 +155,34 @@ class externalstuff extends external_api {
                 'id' => $cm->id,
                 'section' => $cm->section,
                 'modname' => $cm->modname,
-                'name' => $cm->name
+                'name' => $cm->name,
             ];
         }
         return $modules;
     }
 
-    public static function get_target_modules_for_copy_returns() {
+    /**
+     * Returns structure of get_target_modules_for_copy().
+     *
+     * @return external_multiple_structure
+     */
+    public static function get_target_modules_for_copy_returns(): external_multiple_structure {
         return new external_multiple_structure(
             new external_single_structure([
                 'id' => new external_value(PARAM_INT, 'Module ID'),
                 'section' => new external_value(PARAM_INT, 'Section number'),
                 'modname' => new external_value(PARAM_TEXT, 'Module type'),
-                'name' => new external_value(PARAM_TEXT, 'Module name')
+                'name' => new external_value(PARAM_TEXT, 'Module name'),
             ])
         );
     }
 
-    // ------------------------------------------------------------------
-    // Copy/restore (experimental)
-    // copy_activity: uses backup controller for a single activity and restore controller to restore into existing course.
-    // NOTE: restore into existing course is tricky; this implementation disables user data and runs the restore.
-    // Post-restore repositioning of the restored module into a precise section may require additional mapping steps.
-    // ------------------------------------------------------------------
-
-    public static function copy_activity_parameters() {
+    /**
+     * Parameters for copy_activity().
+     *
+     * @return external_function_parameters
+     */
+    public static function copy_activity_parameters(): external_function_parameters {
         return new external_function_parameters([
             'cmid' => new external_value(PARAM_INT, 'Source course module id'),
             'targetcourseid' => new external_value(PARAM_INT, 'Target course id'),
@@ -147,109 +190,24 @@ class externalstuff extends external_api {
         ]);
     }
 
-    function install_module(int $sectionid, int $cmid, string $type):string {
-        global $CFG, $DB, $USER;
-
-        require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
-        require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
-        require_once($CFG->libdir . '/filelib.php');
-
-        // Get course from sectionid.
-        $courseid = $DB->get_field('course_sections', 'course', array('id' => $sectionid));
-        $course = $DB->get_record('course', array('id' => $courseid));
-        $keeptempdirectoriesonbackup = $CFG->keeptempdirectoriesonbackup;
-        $CFG->keeptempdirectoriesonbackup = true;
-
-        // Backup the activity.
-        $bc = new backup_controller(backup::TYPE_1ACTIVITY, $cmid, backup::FORMAT_MOODLE,
-            backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id);
-
-        $backupid       = $bc->get_backupid();
-        $backupbasepath = $bc->get_plan()->get_basepath();
-
-        $bc->execute_plan();
-        $bc->destroy();
-
-        // Restore the backup immediately.
-        $rc = new restore_controller($backupid, $course->id,
-            backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id, backup::TARGET_CURRENT_ADDING);
-
-        // Make sure that the restore_general_groups setting is always enabled when duplicating an activity.
-        $plan = $rc->get_plan();
-        $groupsetting = $plan->get_setting('groups');
-        if (empty($groupsetting->get_value())) {
-            $groupsetting->set_value(true);
-        }
-
-        $cmcontext = context_module::instance($cmid);
-        if (!$rc->execute_precheck()) {
-            $precheckresults = $rc->get_precheck_results();
-            if (is_array($precheckresults) && !empty($precheckresults['errors'])) {
-                if (empty($CFG->keeptempdirectoriesonbackup)) {
-                    fulldelete($backupbasepath);
-                }
-            }
-        }
-
-        try {
-            $rc->execute_plan();
-        } catch (Exception $e) {
-            throw new Exception($e->getMessage());
-        }
-
-        // Now a bit hacky part follows - we try to get the cmid of the newly
-        // restored copy of the module.
-        $newcmid = null;
-        $tasks = $rc->get_plan()->get_tasks();
-        foreach ($tasks as $task) {
-            if (is_subclass_of($task, 'restore_activity_task')) {
-                if ($task->get_old_contextid() == $cmcontext->id) {
-                    $newcmid = $task->get_moduleid();
-                    break;
-                }
-            }
-        }
-
-        $rc->destroy();
-
-        if (empty($CFG->keeptempdirectoriesonbackup)) {
-            fulldelete($backupbasepath);
-        }
-
-        if ($newcmid) {
-            // Move the module to the destination section.
-            $newcm = get_coursemodule_from_id($type, $newcmid);
-            $section = $DB->get_record('course_sections', array('id' => $sectionid));
-            moveto_module($newcm, $section);
-
-            // Update calendar events with the duplicated module.
-            // The following line is to be removed in MDL-58906.
-            course_module_update_calendar_events($newcm->modname, null, $newcm);
-
-            // Trigger course module created event. We can trigger the event only if we know the newcmid.
-            $newcm = get_fast_modinfo($course)->get_cm($newcmid);
-            $event = \core\event\course_module_created::create_from_cm($newcm);
-            $event->trigger();
-        }
-
-        $CFG->keeptempdirectoriesonbackup = $keeptempdirectoriesonbackup;
-
-        // Rebuild the cache for that course so the changes become effective.
-        rebuild_course_cache($courseid, true);
-
-        return get_string('installed', 'block_modlib', ucfirst($type));
-    }
-
-    public static function copy_activity($sourcecmid, $targetcourseid, $targetsection) {
+    /**
+     * Copies a single activity from one course to another.
+     *
+     * @param int $sourcecmid
+     * @param int $targetcourseid
+     * @param int $targetsection
+     * @return array ['status'=>bool, 'message'=>string]
+     */
+    public static function copy_activity(int $sourcecmid, int $targetcourseid, int $targetsection): array {
         global $DB, $CFG, $USER;
 
         $params = self::validate_parameters(self::copy_activity_parameters(), [
             'cmid' => $sourcecmid,
             'targetcourseid' => $targetcourseid,
-            'targetsection' => $targetsection
+            'targetsection' => $targetsection,
         ]);
 
-        // Basic checks
+        // Basic checks.
         $cm = get_coursemodule_from_id(null, $params['cmid'], 0, false, MUST_EXIST);
         $sourcecourse = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
         $targetcourse = $DB->get_record('course', ['id' => $params['targetcourseid']], '*', MUST_EXIST);
@@ -260,8 +218,8 @@ class externalstuff extends external_api {
 
         try {
             // Get course from sectionid.
-            $courseid = $DB->get_field('course_sections', 'course', array('id' => $sourcecmid));
-            $course = $DB->get_record('course', array('id' => $courseid));
+            $courseid = $DB->get_field('course_sections', 'course', ['id' => $sourcecmid]);
+            $course = $DB->get_record('course', ['id' => $courseid]);
             $keeptempdirectoriesonbackup = $CFG->keeptempdirectoriesonbackup;
             $CFG->keeptempdirectoriesonbackup = true;
 
@@ -334,9 +292,6 @@ class externalstuff extends external_api {
 
             $CFG->keeptempdirectoriesonbackup = $keeptempdirectoriesonbackup;
 
-//            $targetcourse = get_course($targetcourseid);
-//            move_section_to($targetcourse, $newcm->sectionnum, $targetsection);
-
             // Rebuild the cache for that course so the changes become effective.
             rebuild_course_cache($courseid, true);
 
@@ -345,117 +300,76 @@ class externalstuff extends external_api {
             return ['status' => false, 'message' => 'Backup/restore failed: ' . $e->getMessage()];
         }
     }
-    public static function copy_activity0($sourcecmid, $targetcourseid, $targetsection) {
-        global $DB, $CFG, $USER;
 
-        $params = self::validate_parameters(self::copy_activity_parameters(), [
-            'cmid' => $sourcecmid,
-            'targetcourseid' => $targetcourseid,
-            'targetsection' => $targetsection
-        ]);
-
-        // Basic checks
-        $cm = get_coursemodule_from_id(null, $params['cmid'], 0, false, MUST_EXIST);
-        $sourcecourse = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
-        $targetcourse = $DB->get_record('course', ['id' => $params['targetcourseid']], '*', MUST_EXIST);
-
-        require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
-
-        try {
-            // Create backup controller for the single activity; produce a file.
-            $bc = new backup_controller(
-                backup::TYPE_1ACTIVITY,
-                $cm->id,
-                backup::FORMAT_MOODLE,
-                backup::INTERACTIVE_NO,
-                backup::MODE_IMPORT,
-                $USER->id
-            );
-
-            $plan = $bc->get_plan();
-            if ($plan->setting_exists('userinfo')) {
-                // Exclude user info if needed
-                $plan->get_setting('userinfo')->set_value(false);
-            }
-
-            // Execute backup
-            $bc->execute_plan();
-
-            // Get results (file)
-//            $results = $bc->get_results();
-//            $backupfile = $results['backup_destination'];
-//            $backupfile = $plan->get('filename');
-            // Get the backup file path for single activity
-            $backupfile = $bc->get_results()['backup_destination'] ?? null;
-
-
-
-            if (!file_exists($backupfile)) {
-                throw new \moodle_exception('Backup file not found: ' . $backupfile);
-            }
-
-            // Destroy backup controller (does not delete file)
-//            $bc->destroy();
-
-            // --- Restore into target course ---
-            $rc = new restore_controller(
-                $backupfile,
-                $targetcourse->id,
-                backup::INTERACTIVE_NO,
-                backup::MODE_IMPORT,
-                $USER->id,
-                ''
-            );
-
-            // Execute restore (precheck + plan)
-            $rc->execute_precheck();
-            $rc->execute_plan();
-
-            // You can inspect mappings via $rc->get_mapping() or restore mappings table if needed.
-            $rc->destroy();
-
-            return ['status' => true, 'message' => 'Activity restored into target course (experimental).'];
-        } catch (\Exception $e) {
-            return ['status' => false, 'message' => 'Backup/restore failed: ' . $e->getMessage()];
-        }
-    }
-
-    public static function copy_activity_returns() {
+    /**
+     * Returns the structure of copy_activity() return values.
+     *
+     * @return external_single_structure
+     */
+    public static function copy_activity_returns(): external_single_structure {
         return new external_single_structure([
             'status' => new external_value(PARAM_BOOL, 'Status'),
             'message' => new external_value(PARAM_TEXT, 'Message'),
         ]);
     }
 
-    // Wrapper: copy_module accepts instance id and calls copy_activity internally.
-    public static function copy_module_parameters() {
+    /**
+     * Parameters for copy_module() wrapper.
+     *
+     * @return external_function_parameters
+     */
+    public static function copy_module_parameters(): external_function_parameters {
         return new external_function_parameters([
             'instanceid' => new external_value(PARAM_INT, 'Module instance id'),
             'targetcourseid' => new external_value(PARAM_INT, 'Target course id'),
-            'targetsection' => new external_value(PARAM_INT, 'Target section (0 end)')
+            'targetsection' => new external_value(PARAM_INT, 'Target section (0 end)'),
         ]);
     }
 
-    public static function copy_module($instanceid, $targetcourseid, $targetsection) {
+    /**
+     * Wrapper for copying a module by instance id.
+     *
+     * @param int $instanceid
+     * @param int $targetcourseid
+     * @param int $targetsection
+     * @return array ['status'=>bool,'message'=>string]
+     */
+    public static function copy_module(int $instanceid, int $targetcourseid, int $targetsection) {
         global $DB;
         $cm = $DB->get_record('course_modules', ['instance' => $instanceid], '*', MUST_EXIST);
         return self::copy_activity($cm->id, $targetcourseid, $targetsection);
     }
 
-    public static function copy_module_returns() {
+    /**
+     * Returns structure of copy_module() return values.
+     *
+     * @return external_single_structure
+     */
+    public static function copy_module_returns(): external_single_structure {
         return new external_single_structure([
             'status' => new external_value(PARAM_BOOL, 'Status'),
             'message' => new external_value(PARAM_TEXT, 'Message'),
         ]);
     }
 
-    public static function get_target_course_sections_parameters() {
+    /**
+     * Parameters for get_target_course_sections() wrapper.
+     *
+     * @return external_function_parameters
+     */
+    public static function get_target_course_sections_parameters(): external_function_parameters {
         return new external_function_parameters([
             'courseid' => new external_value(PARAM_INT, 'Target course ID'),
         ]);
     }
 
-    public static function get_target_course_sections($courseid) {
+    /**
+     * Wrapper for getting target course sections by course id.
+     *
+     * @param int $courseid
+     * @return array ['status'=>bool,'message'=>string]
+     */
+    public static function get_target_course_sections($courseid): array {
         global $DB;
         $params = self::validate_parameters(self::get_target_course_sections_parameters(),
             ['courseid' => $courseid]);
@@ -473,11 +387,17 @@ class externalstuff extends external_api {
         return $sections;
     }
 
-    public static function get_target_course_sections_returns() {
+    /**
+     * Returns structure of get_target_course_sections() return values.
+     *
+     * @return external_multiple_structure
+     */
+    public static function get_target_course_sections_returns(): external_multiple_structure {
         return new external_multiple_structure(
             new external_single_structure([
                 'sectionnum' => new external_value(PARAM_INT, 'Section number'),
                 'name' => new external_value(PARAM_TEXT, 'Section name'),
             ])
         );
-    }}
+    }
+}

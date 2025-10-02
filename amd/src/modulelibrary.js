@@ -41,7 +41,7 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
 
         // When clicking "Copy this module".
         $(document).on('click', '.select-template-module-btn', function() {
-            selectedModule = { cmid: $(this).data('cmid'), name: $(this).data('name') };
+            selectedModule = {cmid: $(this).data('cmid'), name: $(this).data('name')};
             showCopyForm();
         });
 
@@ -73,12 +73,13 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
 
         ajax.call([{
             methodname: 'block_modulelibrary_get_template_course_modules',
-            args: { courseid: parseInt(courseId, 10) }
+            args: {courseid: parseInt(courseId, 10)}
         }])[0].done(function(response) {
             loading.style.display = 'none'; // Hide the spinner.
             templates.render('block_modulelibrary/modules', response)
                 .then((html, js) => {
                     templates.appendNodeContents(container, html, js);
+                    return null;
                 })
                 .catch(notification.exception);
         }).fail(function(err) {
@@ -99,7 +100,7 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
 
         ajax.call([{
             methodname: 'block_modulelibrary_get_target_course_sections',
-            args: { courseid: currentCourseId }
+            args: {courseid: currentCourseId}
         }])[0].done(function(sections) {
             // Data to pass to the Mustache template
             const data = {
@@ -111,6 +112,7 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
                 .then(function(html, js) {
                     $('#modulelibrary-copy-form').html(html);
                     templates.runTemplateJS(js);
+                    return null;
                 })
                 .fail(function(err) {
                     $('#modulelibrary-copy-form').html('<p>Failed to render form</p>');
@@ -143,7 +145,9 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
         }])[0].done(function(response) {
             if (response.status) {
                 notification.addNotification({message: 'Module copied successfully', type: 'success'});
-                setTimeout(function() { window.location.reload(); }, 1200);
+                setTimeout(function() {
+                    window.location.reload();
+                    }, 1200);
             } else {
                 notification.exception(new Error('Copy failed'));
             }

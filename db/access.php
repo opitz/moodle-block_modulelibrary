@@ -14,6 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+/**
+ * Access for block_modulelibrary
+ *
+ * @package     block_modulelibrary
+ * @copyright   2025 onwards UCL
+ * @author      Matthias Opitz <m.opitz@ucl.ac.uk>
+ * @license     https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
 defined('MOODLE_INTERNAL') || die();
 
 $capabilities = [
@@ -23,10 +32,10 @@ $capabilities = [
         'contextlevel' => CONTEXT_COURSE,
         'archetypes' => [
             'editingteacher' => CAP_ALLOW,
-            'manager' => CAP_ALLOW
+            'manager' => CAP_ALLOW,
         ],
 
-        'clonepermissionsfrom' => 'moodle/site:manageblocks'
+        'clonepermissionsfrom' => 'moodle/site:manageblocks',
     ],
 
     'block/modulelibrary:myaddinstance' => [
@@ -36,6 +45,6 @@ $capabilities = [
             'user' => CAP_ALLOW,
         ],
 
-        'clonepermissionsfrom' => 'moodle/my:manageblocks'
+        'clonepermissionsfrom' => 'moodle/my:manageblocks',
     ],
 ];
