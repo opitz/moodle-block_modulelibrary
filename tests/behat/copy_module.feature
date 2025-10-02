@@ -1,3 +1,4 @@
+@block @block_modulelibrary
 Feature: Module Library copy module
   In order to reuse template modules
   As a teacher with editing on
