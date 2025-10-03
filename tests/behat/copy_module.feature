@@ -35,8 +35,10 @@ Feature: Copy modules from template course to a new course
     And I am on "Course 1" course homepage with editing mode on
     And I add the "Module Library" block
     Then I should see "Module Library" in the "Module Library" "block"
-
-
-  When I use the "block_modulelibrary" block to copy modules from "Template Course"
-    Then I should see "Assignment" in the course "New Course"
-    And I should see "Quiz" in the course "New Course"
+    When I select "Template Course" from the "Select template course" singleselect
+    Then I should see "Test quiz"
+    When I click on "button[data-name='Test quiz']" "css_element"
+    Then I should see "Select target section"
+    And I select "Section 1" from the "target-section" singleselect
+    And I press "Confirm copy"
+    Then I should see "Module copied successfully"

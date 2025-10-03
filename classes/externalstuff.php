@@ -16,7 +16,9 @@
 
 namespace block_modulelibrary;
 
+use context_course;
 use context_module;
+use context_system;
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_value;
@@ -223,6 +225,16 @@ class externalstuff extends external_api {
             $keeptempdirectoriesonbackup = $CFG->keeptempdirectoriesonbackup;
             $CFG->keeptempdirectoriesonbackup = true;
 
+            // Grant backup/restore capabilities.
+            // As the USER most likely will not have a role in the template course
+            //there would be no permission to perform a backup.
+            //Therefore, we will have to temporarly grant a manager role to the USER.
+            $systemcontext = context_system::instance();
+            $coursecontext = context_course::instance($courseid);
+            $managerrole = $DB->get_field('role', 'id', ['shortname' => 'manager'], MUST_EXIST);
+            // Assign the admin role in the system context.
+            role_assign($managerrole, $USER->id, $coursecontext->id);
+
             // Backup the activity.
             $bc = new backup_controller(backup::TYPE_1ACTIVITY, $cm->id, backup::FORMAT_MOODLE,
                 backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id);
@@ -241,6 +253,9 @@ class externalstuff extends external_api {
 
             $bc->execute_plan();
             $bc->destroy();
+
+            // Unassign the admin role again.
+            role_unassign($managerrole, $USER->id, $coursecontext->id);
 
             // Restore the backup immediately.
             $rc = new restore_controller($backupid, $targetcourseid,

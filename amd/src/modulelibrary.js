@@ -143,6 +143,7 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
                 targetsection: targetsection
             }
         }])[0].done(function(response) {
+            console.log(response);
             if (response.status) {
                 notification.addNotification({message: 'Module copied successfully', type: 'success'});
                 setTimeout(function() {
