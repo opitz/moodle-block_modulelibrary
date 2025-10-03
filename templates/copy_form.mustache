@@ -32,7 +32,7 @@
 <div class="copy-form-container p-3 border rounded bg-light">
 
     <h6 class="mb-3">
-        {{#str}} selecttargetsection, block_modulelibrary {{/str}}
+        {{#str}} selectedmodule, block_modulelibrary {{/str}}
     </h6>
 
     <p class="fw-bold">{{modulename}}</p>
@@ -44,9 +44,6 @@
                 {{#str}} selecttargetsection, block_modulelibrary {{/str}}
             </label>
             <select id="target-section" class="form-control" required>
-                <option value="0">
-                    {{#str}} appendatend, block_modulelibrary {{/str}}
-                </option>
                 {{#sections}}
                     <option value="{{sectionnum}}">{{name}}</option>
                 {{/sections}}

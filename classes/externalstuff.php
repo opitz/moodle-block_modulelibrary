@@ -227,8 +227,8 @@ class externalstuff extends external_api {
 
             // Grant backup/restore capabilities.
             // As the USER most likely will not have a role in the template course
-            //there would be no permission to perform a backup.
-            //Therefore, we will have to temporarly grant a manager role to the USER.
+            // there would be no permission to perform a backup.
+            // Therefore, we will have to temporarly grant a manager role to the USER.
             $systemcontext = context_system::instance();
             $coursecontext = context_course::instance($courseid);
             $managerrole = $DB->get_field('role', 'id', ['shortname' => 'manager'], MUST_EXIST);
@@ -394,10 +394,17 @@ class externalstuff extends external_api {
 
         $sections = [];
         foreach ($modinfo->get_section_info_all() as $section) {
-            $sections[] = [
-                'sectionnum' => $section->section,
-                'name' => $section->name ?: 'Section ' . $section->section,
-            ];
+            if (($section->section === 0)) {
+                $sections[] = [
+                    'sectionnum' => $section->section,
+                    'name' => $section->name ?: get_string('general'),
+                ];
+            } else {
+                $sections[] = [
+                    'sectionnum' => $section->section,
+                    'name' => $section->name ?: 'Section ' . $section->section,
+                ];
+            }
         }
         return $sections;
     }

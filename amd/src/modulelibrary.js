@@ -102,7 +102,7 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
             methodname: 'block_modulelibrary_get_target_course_sections',
             args: {courseid: currentCourseId}
         }])[0].done(function(sections) {
-            // Data to pass to the Mustache template
+            // Data to pass to the Mustache template.
             const data = {
                 modulename: selectedModule.name,
                 sections: sections
@@ -143,7 +143,6 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
                 targetsection: targetsection
             }
         }])[0].done(function(response) {
-            console.log(response);
             if (response.status) {
                 notification.addNotification({message: 'Module copied successfully', type: 'success'});
                 setTimeout(function() {
