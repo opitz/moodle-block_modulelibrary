@@ -233,7 +233,7 @@ class externalstuff extends external_api {
             $coursecontext = context_course::instance($courseid);
             $managerrole = $DB->get_field('role', 'id', ['shortname' => 'manager'], MUST_EXIST);
             // Assign the admin role in the system context.
-            role_assign($managerrole, $USER->id, $coursecontext->id);
+            role_assign($managerrole, $USER->id, $systemcontext->id);
 
             // Backup the activity.
             $bc = new backup_controller(backup::TYPE_1ACTIVITY, $cm->id, backup::FORMAT_MOODLE,
@@ -255,7 +255,7 @@ class externalstuff extends external_api {
             $bc->destroy();
 
             // Unassign the admin role again.
-            role_unassign($managerrole, $USER->id, $coursecontext->id);
+            role_unassign($managerrole, $USER->id, $systemcontext->id);
 
             // Restore the backup immediately.
             $rc = new restore_controller($backupid, $targetcourseid,
