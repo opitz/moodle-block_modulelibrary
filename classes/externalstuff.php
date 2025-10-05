@@ -228,18 +228,17 @@ class externalstuff extends external_api {
             // Grant backup/restore capabilities.
             // As the USER most likely will not have a role in the template course
             // there would be no permission to perform a backup.
-            // Therefore, we will have to temporarly grant a manager role to the USER.
-            $systemcontext = context_system::instance();
+            // Therefore, we will have to temporarly grant a manager role for that course to the USER.
             $coursecontext = context_course::instance($courseid);
             $managerrole = $DB->get_field('role', 'id', ['shortname' => 'manager'], MUST_EXIST);
-            // Assign the admin role in the system context.
+            // Assign the admin role in the course context.
             role_assign($managerrole, $USER->id, $coursecontext->id);
 
             // Backup the activity.
             $bc = new backup_controller(backup::TYPE_1ACTIVITY, $cm->id, backup::FORMAT_MOODLE,
                 backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id);
 
-            // Force exclude user data.
+            // Force excluding any user data.
             $settings = $bc->get_plan()->get_settings();
             if (isset($settings['users'])) {
                 $settings['users']->set_value(false);
@@ -254,7 +253,7 @@ class externalstuff extends external_api {
             $bc->execute_plan();
             $bc->destroy();
 
-            // Unassign the admin role again.
+            // Unassign the manager role again.
             role_unassign($managerrole, $USER->id, $coursecontext->id);
 
             // Restore the backup immediately.
@@ -310,7 +309,7 @@ class externalstuff extends external_api {
             // Rebuild the cache for that course so the changes become effective.
             rebuild_course_cache($courseid, true);
 
-            return ['status' => true, 'message' => 'Activity restored into target course (experimental).'];
+            return ['status' => true, 'message' => 'Activity restored into target course.'];
         } catch (Exception $e) {
             return ['status' => false, 'message' => 'Backup/restore failed: ' . $e->getMessage()];
         }
