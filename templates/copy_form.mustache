@@ -40,10 +40,9 @@
     <form id="copy-assessment-form">
 
         <div class="mb-3">
-            <label for="target-section" class="form-label">
-                {{#str}} selecttargetsection, block_modulelibrary {{/str}}
-            </label>
             <select id="target-section" class="form-control" required>
+                <option value="" disabled selected>{{#str}} selecttargetsection, block_modulelibrary {{/str}}</option>
+
                 {{#sections}}
                     <option value="{{sectionnum}}">{{name}}</option>
                 {{/sections}}
