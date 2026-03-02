@@ -17,10 +17,9 @@
 /**
  * Strings for block_modulelibrary
  *
- * @package     block_modulelibrary
- * @copyright   2025 onwards UCL
- * @author      Matthias Opitz <m.opitz@ucl.ac.uk>
- * @license     https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package   block_modulelibrary
+ * @copyright 2026 Matthias Opitz <opitz@gmx.de>
+ * @license   https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 $string['appendatend'] = 'Append at end';
@@ -30,6 +29,7 @@ $string['copyassessmentconfirm'] = 'Copy assessment? This will copy structure on
 $string['copymodule'] = 'Copy';
 $string['copymoduleconfirm'] = 'Copy whole module? This will copy structure only, without user data.';
 $string['loading'] = 'Loading…';
+$string['nomodulesfound'] = 'No modules found in this template course.';
 $string['pluginname'] = 'Module Library';
 $string['selectedmodule'] = 'Selected module:';
 $string['selecttargetsection'] = 'Select target section';

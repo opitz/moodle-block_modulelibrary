@@ -17,10 +17,9 @@
 /**
  * Settings for block_modulelibrary
  *
- * @package     block_modulelibrary
- * @copyright   2025 onwards UCL
- * @author      Matthias Opitz <m.opitz@ucl.ac.uk>
- * @license     https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package   block_modulelibrary
+ * @copyright 2026 Matthias Opitz <opitz@gmx.de>
+ * @license   https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
