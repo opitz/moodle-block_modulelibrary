@@ -34,7 +34,7 @@ use restore_controller;
  *
  * @package   block_modulelibrary
  * @category  external
- * @copyright 2025 UCL
+ * @copyright 2026 Matthias Opitz <opitz@gmx.de>
  * @license   https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class externalstuff extends external_api {

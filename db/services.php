@@ -17,10 +17,9 @@
 /**
  * Services for block_modulelibrary
  *
- * @package     block_modulelibrary
- * @copyright   2025 onwards UCL
- * @author      Matthias Opitz <m.opitz@ucl.ac.uk>
- * @license     https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package   block_modulelibrary
+ * @copyright 2026 Matthias Opitz <opitz@gmx.de>
+ * @license   https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
@@ -32,7 +31,7 @@ $functions = [
         'description' => 'Return all sections of the target course.',
         'type'        => 'read',
         'ajax'        => true,
-        'capabilities'=> 'moodle/course:manageactivities',
+        'capabilities' => 'moodle/course:manageactivities',
     ],
 
     'block_modulelibrary_get_template_course_modules' => [
@@ -41,7 +40,7 @@ $functions = [
         'description' => 'Get list of sections & modules from a template course',
         'type'        => 'read',
         'ajax'        => true,
-        'capabilities'=> 'moodle/course:manageactivities',
+        'capabilities' => 'moodle/course:manageactivities',
     ],
     'block_modulelibrary_get_target_modules_for_copy' => [
         'classname'   => 'block_modulelibrary\\externalstuff',
@@ -49,7 +48,7 @@ $functions = [
         'description' => 'Get modules of the current (target) course for section dropdown',
         'type'        => 'read',
         'ajax'        => true,
-        'capabilities'=> 'moodle/course:manageactivities',
+        'capabilities' => 'moodle/course:manageactivities',
     ],
     'block_modulelibrary_copy_activity' => [
         'classname'   => 'block_modulelibrary\\externalstuff',
@@ -57,7 +56,7 @@ $functions = [
         'description' => 'Copy a single activity (for a template module) to target course/section',
         'type'        => 'write',
         'ajax'        => true,
-        'capabilities'=> 'moodle/course:manageactivities',
+        'capabilities' => 'moodle/course:manageactivities',
     ],
     'block_modulelibrary_copy_module' => [
         'classname'   => 'block_modulelibrary\\externalstuff',
@@ -65,6 +64,6 @@ $functions = [
         'description' => 'Copy a whole module instance (wrapper) to target course/section',
         'type'        => 'write',
         'ajax'        => true,
-        'capabilities'=> 'moodle/course:manageactivities',
+        'capabilities' => 'moodle/course:manageactivities',
     ],
 ];
