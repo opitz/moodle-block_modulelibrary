@@ -73,7 +73,7 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
 
         ajax.call([{
             methodname: 'block_modulelibrary_get_template_course_modules',
-            args: {courseid: parseInt(courseId, 10)}
+            args: {courseid: parseInt(courseId, 10), targetcourseid: currentCourseId}
         }])[0].done(function(response) {
             loading.style.display = 'none'; // Hide the spinner.
             templates.render('block_modulelibrary/modules', response)
@@ -149,7 +149,7 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
                     window.location.reload();
                     }, 1200);
             } else {
-                notification.exception(new Error('Copy failed'));
+                notification.exception(new Error(response.message || 'Copy failed'));
             }
         }).fail(function(err) {
             notification.exception(err);

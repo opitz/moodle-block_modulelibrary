@@ -16,19 +16,18 @@
 
 namespace block_modulelibrary;
 
+use backup;
+use backup_controller;
 use context_course;
 use context_module;
-use context_system;
 use core_external\external_api;
 use core_external\external_function_parameters;
-use core_external\external_value;
-use core_external\external_single_structure;
 use core_external\external_multiple_structure;
-
-use backup_controller;
+use core_external\external_single_structure;
+use core_external\external_value;
 use Exception;
+use invalid_parameter_exception;
 use restore_controller;
-use backup;
 
 /**
  * External API functions for the Module Library block.
@@ -39,6 +38,37 @@ use backup;
  * @license   https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class externalstuff extends external_api {
+    /**
+     * Validate the target course context and required capability.
+     *
+     * @param int $courseid
+     * @return context_course
+     */
+    private static function validate_target_course_context(int $courseid): context_course {
+        $context = context_course::instance($courseid);
+        self::validate_context($context);
+        require_capability('moodle/course:manageactivities', $context);
+        return $context;
+    }
+
+    /**
+     * Verify that a course belongs to the configured template category.
+     *
+     * @param int $courseid
+     * @throws invalid_parameter_exception
+     */
+    private static function validate_template_course(int $courseid): void {
+        global $DB;
+
+        $templatecategory = (int)get_config('block_modulelibrary', 'templatecategory');
+        if (empty($templatecategory)) {
+            throw new invalid_parameter_exception('Template category is not configured');
+        }
+
+        if (!$DB->record_exists('course', ['id' => $courseid, 'category' => $templatecategory])) {
+            throw new invalid_parameter_exception('Template course is not in the configured template category');
+        }
+    }
 
     /**
      * Returns parameters for get_template_course_modules().
@@ -47,7 +77,8 @@ class externalstuff extends external_api {
      */
     public static function get_template_course_modules_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'courseid' => new external_value(PARAM_INT, 'Course id'),
+            'courseid' => new external_value(PARAM_INT, 'Template course id'),
+            'targetcourseid' => new external_value(PARAM_INT, 'Current target course id'),
         ]);
     }
 
@@ -55,46 +86,64 @@ class externalstuff extends external_api {
      * Returns sections and modules of a template course.
      *
      * @param int $courseid
-     * @return array ['title'=>string, 'sections'=>array]
+     * @param int $targetcourseid
+     * @return array
      */
-    public static function get_template_course_modules(int $courseid): array {
+    public static function get_template_course_modules(int $courseid, int $targetcourseid): array {
         global $DB;
 
-        $params = self::validate_parameters(self::get_template_course_modules_parameters(),
-            ['courseid' => $courseid]);
+        $params = self::validate_parameters(
+            self::get_template_course_modules_parameters(),
+            ['courseid' => $courseid, 'targetcourseid' => $targetcourseid]
+        );
+
+        self::validate_target_course_context($params['targetcourseid']);
+        self::validate_template_course($params['courseid']);
 
         $course = $DB->get_record('course', ['id' => $params['courseid']], '*', MUST_EXIST);
 
         $sections = [];
         $modinfo = get_fast_modinfo($course);
-        $allsections = $modinfo->get_section_info_all();
-        $cms = $modinfo->get_cms();
+        $sectioncmids = $modinfo->get_sections();
 
-        foreach ($allsections as $section) {
-            // Do not show section 0 from the template.
-            if ($section->sectionnum == 0) {
+        foreach ($modinfo->get_section_info_all() as $section) {
+            if ((int)$section->section === 0) {
                 continue;
             }
-            $s = ['section' => $section->sectionnum, 'name' => $section->name, 'modules' => []];
 
-            foreach ($cms as $cm) {
-                if ($cm->sectionnum == $section->sectionnum) {
-                    $s['modules'][] = [
-                        'cmid' => $cm->id,
-                        'modname' => $cm->modname,
-                        'name' => $cm->name,
-                        'instance' => $cm->instance,
-                    ];
-                }
+            $cmids = $sectioncmids[$section->section] ?? [];
+            if (empty($cmids)) {
+                continue;
             }
 
-            if (!empty($s['modules'])) {
-                $sections[] = $s;
+            $sectionmodules = [];
+            foreach ($cmids as $cmid) {
+                if (!isset($modinfo->cms[$cmid])) {
+                    continue;
+                }
+                $cm = $modinfo->cms[$cmid];
+                if (!$cm->visible) {
+                    continue;
+                }
+                $sectionmodules[] = [
+                    'cmid' => $cm->id,
+                    'modname' => $cm->modname,
+                    'name' => format_string($cm->name, true, ['context' => $cm->context]),
+                    'instance' => $cm->instance,
+                ];
+            }
+
+            if (!empty($sectionmodules)) {
+                $sections[] = [
+                    'section' => $section->section,
+                    'name' => $section->name ?: get_section_name($course, $section),
+                    'modules' => $sectionmodules,
+                ];
             }
         }
 
         return [
-            'title' => $course->fullname,
+            'title' => format_string($course->fullname),
             'sections' => $sections,
         ];
     }
@@ -145,19 +194,21 @@ class externalstuff extends external_api {
         global $DB;
 
         $params = self::validate_parameters(self::get_target_modules_for_copy_parameters(), ['courseid' => $courseid]);
+        self::validate_target_course_context($params['courseid']);
 
         $course = $DB->get_record('course', ['id' => $params['courseid']], '*', MUST_EXIST);
         $modules = [];
         $modinfo = get_fast_modinfo($course);
+
         foreach ($modinfo->get_cms() as $cm) {
             if (!$cm->uservisible) {
                 continue;
             }
             $modules[] = [
                 'id' => $cm->id,
-                'section' => $cm->section,
+                'section' => $cm->sectionnum,
                 'modname' => $cm->modname,
-                'name' => $cm->name,
+                'name' => format_string($cm->name, true, ['context' => $cm->context]),
             ];
         }
         return $modules;
@@ -188,7 +239,7 @@ class externalstuff extends external_api {
         return new external_function_parameters([
             'cmid' => new external_value(PARAM_INT, 'Source course module id'),
             'targetcourseid' => new external_value(PARAM_INT, 'Target course id'),
-            'targetsection' => new external_value(PARAM_INT, 'Target section (0 = append end)'),
+            'targetsection' => new external_value(PARAM_INT, 'Target section number'),
         ]);
     }
 
@@ -198,7 +249,7 @@ class externalstuff extends external_api {
      * @param int $sourcecmid
      * @param int $targetcourseid
      * @param int $targetsection
-     * @return array ['status'=>bool, 'message'=>string]
+     * @return array
      */
     public static function copy_activity(int $sourcecmid, int $targetcourseid, int $targetsection): array {
         global $DB, $CFG, $USER;
@@ -209,34 +260,43 @@ class externalstuff extends external_api {
             'targetsection' => $targetsection,
         ]);
 
-        // Basic checks.
+        self::validate_target_course_context($params['targetcourseid']);
+
         $cm = get_coursemodule_from_id(null, $params['cmid'], 0, false, MUST_EXIST);
-        $sourcecourse = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
+        self::validate_template_course((int)$cm->course);
+
         $targetcourse = $DB->get_record('course', ['id' => $params['targetcourseid']], '*', MUST_EXIST);
+        $section = $DB->get_record(
+            'course_sections',
+            ['course' => $params['targetcourseid'], 'section' => $params['targetsection']],
+            '*',
+            MUST_EXIST
+        );
 
         require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
         require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
         require_once($CFG->libdir . '/filelib.php');
 
+        $coursecontext = context_course::instance($cm->course);
+        $managerrole = $DB->get_field('role', 'id', ['shortname' => 'manager'], MUST_EXIST);
+        $keeptempdirectoriesonbackup = $CFG->keeptempdirectoriesonbackup;
+        $roleassigned = false;
+
         try {
-            // Get course from sectionid.
-            $courseid = $DB->get_field('course_sections', 'course', ['id' => $cm->section]);
-            $course = $DB->get_record('course', ['id' => $courseid]);
-            $keeptempdirectoriesonbackup = $CFG->keeptempdirectoriesonbackup;
             $CFG->keeptempdirectoriesonbackup = true;
 
-            // Grant backup/restore capabilities.
-            // As the USER most likely will not have a role in the template course
-            // there would be no permission to perform a backup.
-            // Therefore, we will have to temporarly grant a manager role for that course to the USER.
-            $coursecontext = context_course::instance($courseid);
-            $managerrole = $DB->get_field('role', 'id', ['shortname' => 'manager'], MUST_EXIST);
-            // Assign the admin role in the course context.
+            // Temporarily grant manager on the source template course so backup can run.
             role_assign($managerrole, $USER->id, $coursecontext->id);
+            $roleassigned = true;
 
-            // Backup the activity.
-            $bc = new backup_controller(backup::TYPE_1ACTIVITY, $cm->id, backup::FORMAT_MOODLE,
-                backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id);
+            $bc = new backup_controller(
+                backup::TYPE_1ACTIVITY,
+                $cm->id,
+                backup::FORMAT_MOODLE,
+                backup::INTERACTIVE_NO,
+                backup::MODE_GENERAL,
+                $USER->id
+            );
 
             // Force excluding any user data.
             $settings = $bc->get_plan()->get_settings();
@@ -247,37 +307,29 @@ class externalstuff extends external_api {
                 $settings['userinfo']->set_value(false);
             }
 
-            $backupid       = $bc->get_backupid();
+            $backupid = $bc->get_backupid();
             $backupbasepath = $bc->get_plan()->get_basepath();
 
             $bc->execute_plan();
             $bc->destroy();
 
-            // Unassign the manager role again.
-            role_unassign($managerrole, $USER->id, $coursecontext->id);
-
-            // Restore the backup immediately.
-            $rc = new restore_controller($backupid, $targetcourseid,
-                backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id, backup::TARGET_CURRENT_ADDING);
+            $rc = new restore_controller(
+                $backupid,
+                $params['targetcourseid'],
+                backup::INTERACTIVE_NO,
+                backup::MODE_GENERAL,
+                $USER->id,
+                backup::TARGET_CURRENT_ADDING
+            );
             $rc->set_status(backup::STATUS_AWAITING);
+            $rc->execute_plan();
 
-            try {
-                $rc->execute_plan();
-            } catch (Exception $e) {
-                throw new Exception($e->getMessage());
-            }
-
-            // Now a bit hacky part follows - we try to get the cmid of the newly
-            // restored copy of the module.
             $cmcontext = context_module::instance($cm->id);
             $newcmid = null;
-            $tasks = $rc->get_plan()->get_tasks();
-            foreach ($tasks as $task) {
-                if (is_subclass_of($task, 'restore_activity_task')) {
-                    if ($task->get_old_contextid() == $cmcontext->id) {
-                        $newcmid = $task->get_moduleid();
-                        break;
-                    }
+            foreach ($rc->get_plan()->get_tasks() as $task) {
+                if (is_subclass_of($task, 'restore_activity_task') && $task->get_old_contextid() == $cmcontext->id) {
+                    $newcmid = $task->get_moduleid();
+                    break;
                 }
             }
 
@@ -288,30 +340,27 @@ class externalstuff extends external_api {
             }
 
             if ($newcmid) {
-                // Move the module to the destination section.
                 $newcm = get_coursemodule_from_id(null, $newcmid, 0, true, MUST_EXIST);
-                $params = ['course' => $targetcourseid, 'section' => $targetsection];
-                $section = $DB->get_record('course_sections', $params);
                 moveto_module($newcm, $section);
 
-                // Update calendar events with the duplicated module.
-                // The following line is to be removed in MDL-58906.
                 course_module_update_calendar_events($newcm->modname, null, $newcm);
 
-                // Trigger course module created event. We can trigger the event only if we know the newcmid.
-                $newcm = get_fast_modinfo($targetcourseid)->get_cm($newcmid);
+                $newcm = get_fast_modinfo($targetcourse)->get_cm($newcmid);
                 $event = \core\event\course_module_created::create_from_cm($newcm);
                 $event->trigger();
             }
 
-            $CFG->keeptempdirectoriesonbackup = $keeptempdirectoriesonbackup;
-
-            // Rebuild the cache for that course so the changes become effective.
-            rebuild_course_cache($courseid, true);
+            // Rebuild cache for the target course.
+            rebuild_course_cache($params['targetcourseid'], true);
 
             return ['status' => true, 'message' => 'Activity restored into target course.'];
         } catch (Exception $e) {
             return ['status' => false, 'message' => 'Backup/restore failed: ' . $e->getMessage()];
+        } finally {
+            if ($roleassigned) {
+                role_unassign($managerrole, $USER->id, $coursecontext->id);
+            }
+            $CFG->keeptempdirectoriesonbackup = $keeptempdirectoriesonbackup;
         }
     }
 
@@ -334,24 +383,34 @@ class externalstuff extends external_api {
      */
     public static function copy_module_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'instanceid' => new external_value(PARAM_INT, 'Module instance id'),
+            'instanceid' => new external_value(PARAM_INT, 'Module instance id or course module id'),
             'targetcourseid' => new external_value(PARAM_INT, 'Target course id'),
-            'targetsection' => new external_value(PARAM_INT, 'Target section (0 end)'),
+            'targetsection' => new external_value(PARAM_INT, 'Target section number'),
         ]);
     }
 
     /**
-     * Wrapper for copying a module by instance id.
+     * Wrapper for copying by instance id.
      *
      * @param int $instanceid
      * @param int $targetcourseid
      * @param int $targetsection
-     * @return array ['status'=>bool,'message'=>string]
+     * @return array
      */
-    public static function copy_module(int $instanceid, int $targetcourseid, int $targetsection) {
+    public static function copy_module(int $instanceid, int $targetcourseid, int $targetsection): array {
         global $DB;
-        $cm = $DB->get_record('course_modules', ['instance' => $instanceid], '*', MUST_EXIST);
-        return self::copy_activity($cm->id, $targetcourseid, $targetsection);
+
+        // Backward compatible: prefer exact course_modules.id match.
+        $cm = $DB->get_record('course_modules', ['id' => $instanceid]);
+        if (!$cm) {
+            $matches = $DB->get_records('course_modules', ['instance' => $instanceid]);
+            if (count($matches) !== 1) {
+                throw new invalid_parameter_exception('Unable to uniquely resolve module by instance id');
+            }
+            $cm = reset($matches);
+        }
+
+        return self::copy_activity((int)$cm->id, $targetcourseid, $targetsection);
     }
 
     /**
@@ -381,29 +440,27 @@ class externalstuff extends external_api {
      * Wrapper for getting target course sections by course id.
      *
      * @param int $courseid
-     * @return array ['status'=>bool,'message'=>string]
+     * @return array
      */
     public static function get_target_course_sections($courseid): array {
         global $DB;
-        $params = self::validate_parameters(self::get_target_course_sections_parameters(),
-            ['courseid' => $courseid]);
+
+        $params = self::validate_parameters(
+            self::get_target_course_sections_parameters(),
+            ['courseid' => $courseid]
+        );
+
+        self::validate_target_course_context($params['courseid']);
 
         $course = $DB->get_record('course', ['id' => $params['courseid']], '*', MUST_EXIST);
         $modinfo = get_fast_modinfo($course);
 
         $sections = [];
         foreach ($modinfo->get_section_info_all() as $section) {
-            if (($section->section === 0)) {
-                $sections[] = [
-                    'sectionnum' => $section->section,
-                    'name' => $section->name ?: get_string('general'),
-                ];
-            } else {
-                $sections[] = [
-                    'sectionnum' => $section->section,
-                    'name' => $section->name ?: 'Section ' . $section->section,
-                ];
-            }
+            $sections[] = [
+                'sectionnum' => $section->section,
+                'name' => $section->name ?: get_section_name($course, $section),
+            ];
         }
         return $sections;
     }

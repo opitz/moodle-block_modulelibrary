@@ -30,6 +30,7 @@ $string['copyassessmentconfirm'] = 'Copy assessment? This will copy structure on
 $string['copymodule'] = 'Copy';
 $string['copymoduleconfirm'] = 'Copy whole module? This will copy structure only, without user data.';
 $string['loading'] = 'Loading…';
+$string['nomodulesfound'] = 'No modules found in this template course.';
 $string['pluginname'] = 'Module Library';
 $string['selectedmodule'] = 'Selected module:';
 $string['selecttargetsection'] = 'Select target section';
