@@ -18,7 +18,6 @@ namespace block_modulelibrary;
 
 use context_course;
 use context_module;
-use context_system;
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_value;
@@ -39,6 +38,18 @@ use backup;
  * @license   https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class externalstuff extends external_api {
+
+    /**
+     * Validates course context and required capability for module library actions.
+     *
+     * @param int $courseid
+     * @return void
+     */
+    protected static function validate_course_access(int $courseid): void {
+        $context = context_course::instance($courseid);
+        self::validate_context($context);
+        require_capability('moodle/course:manageactivities', $context);
+    }
 
     /**
      * Returns parameters for get_template_course_modules().
@@ -64,6 +75,7 @@ class externalstuff extends external_api {
             ['courseid' => $courseid]);
 
         $course = $DB->get_record('course', ['id' => $params['courseid']], '*', MUST_EXIST);
+        self::validate_course_access((int)$course->id);
 
         $sections = [];
         $modinfo = get_fast_modinfo($course);
@@ -147,6 +159,7 @@ class externalstuff extends external_api {
         $params = self::validate_parameters(self::get_target_modules_for_copy_parameters(), ['courseid' => $courseid]);
 
         $course = $DB->get_record('course', ['id' => $params['courseid']], '*', MUST_EXIST);
+        self::validate_course_access((int)$course->id);
         $modules = [];
         $modinfo = get_fast_modinfo($course);
         foreach ($modinfo->get_cms() as $cm) {
@@ -214,15 +227,22 @@ class externalstuff extends external_api {
         $sourcecourse = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
         $targetcourse = $DB->get_record('course', ['id' => $params['targetcourseid']], '*', MUST_EXIST);
 
+        self::validate_course_access((int)$sourcecourse->id);
+        self::validate_course_access((int)$targetcourse->id);
+
         require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
         require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
         require_once($CFG->libdir . '/filelib.php');
+
+        $coursecontext = null;
+        $managerrole = null;
+        $assignedrole = false;
+        $keeptempdirectoriesonbackup = $CFG->keeptempdirectoriesonbackup;
 
         try {
             // Get course from sectionid.
             $courseid = $DB->get_field('course_sections', 'course', ['id' => $cm->section]);
             $course = $DB->get_record('course', ['id' => $courseid]);
-            $keeptempdirectoriesonbackup = $CFG->keeptempdirectoriesonbackup;
             $CFG->keeptempdirectoriesonbackup = true;
 
             // Grant backup/restore capabilities.
@@ -233,6 +253,7 @@ class externalstuff extends external_api {
             $managerrole = $DB->get_field('role', 'id', ['shortname' => 'manager'], MUST_EXIST);
             // Assign the admin role in the course context.
             role_assign($managerrole, $USER->id, $coursecontext->id);
+            $assignedrole = true;
 
             // Backup the activity.
             $bc = new backup_controller(backup::TYPE_1ACTIVITY, $cm->id, backup::FORMAT_MOODLE,
@@ -255,17 +276,14 @@ class externalstuff extends external_api {
 
             // Unassign the manager role again.
             role_unassign($managerrole, $USER->id, $coursecontext->id);
+            $assignedrole = false;
 
             // Restore the backup immediately.
             $rc = new restore_controller($backupid, $targetcourseid,
                 backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id, backup::TARGET_CURRENT_ADDING);
             $rc->set_status(backup::STATUS_AWAITING);
 
-            try {
-                $rc->execute_plan();
-            } catch (Exception $e) {
-                throw new Exception($e->getMessage());
-            }
+            $rc->execute_plan();
 
             // Now a bit hacky part follows - we try to get the cmid of the newly
             // restored copy of the module.
@@ -283,7 +301,7 @@ class externalstuff extends external_api {
 
             $rc->destroy();
 
-            if (empty($CFG->keeptempdirectoriesonbackup)) {
+            if (empty($keeptempdirectoriesonbackup)) {
                 fulldelete($backupbasepath);
             }
 
@@ -304,14 +322,17 @@ class externalstuff extends external_api {
                 $event->trigger();
             }
 
-            $CFG->keeptempdirectoriesonbackup = $keeptempdirectoriesonbackup;
-
             // Rebuild the cache for that course so the changes become effective.
             rebuild_course_cache($courseid, true);
 
             return ['status' => true, 'message' => 'Activity restored into target course.'];
         } catch (Exception $e) {
             return ['status' => false, 'message' => 'Backup/restore failed: ' . $e->getMessage()];
+        } finally {
+            $CFG->keeptempdirectoriesonbackup = $keeptempdirectoriesonbackup;
+            if ($assignedrole && $managerrole && $coursecontext) {
+                role_unassign($managerrole, $USER->id, $coursecontext->id);
+            }
         }
     }
 
@@ -348,7 +369,7 @@ class externalstuff extends external_api {
      * @param int $targetsection
      * @return array ['status'=>bool,'message'=>string]
      */
-    public static function copy_module(int $instanceid, int $targetcourseid, int $targetsection) {
+    public static function copy_module(int $instanceid, int $targetcourseid, int $targetsection): array {
         global $DB;
         $cm = $DB->get_record('course_modules', ['instance' => $instanceid], '*', MUST_EXIST);
         return self::copy_activity($cm->id, $targetcourseid, $targetsection);
@@ -389,6 +410,7 @@ class externalstuff extends external_api {
             ['courseid' => $courseid]);
 
         $course = $DB->get_record('course', ['id' => $params['courseid']], '*', MUST_EXIST);
+        self::validate_course_access((int)$course->id);
         $modinfo = get_fast_modinfo($course);
 
         $sections = [];
