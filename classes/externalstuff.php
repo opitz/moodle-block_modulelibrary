@@ -23,7 +23,6 @@ use core_external\external_function_parameters;
 use core_external\external_value;
 use core_external\external_single_structure;
 use core_external\external_multiple_structure;
-
 use backup_controller;
 use Exception;
 use restore_controller;
@@ -38,7 +37,6 @@ use backup;
  * @license   https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class externalstuff extends external_api {
-
     /**
      * Validates course context and required capability for module library actions.
      *
@@ -71,8 +69,10 @@ class externalstuff extends external_api {
     public static function get_template_course_modules(int $courseid): array {
         global $DB;
 
-        $params = self::validate_parameters(self::get_template_course_modules_parameters(),
-            ['courseid' => $courseid]);
+        $params = self::validate_parameters(
+            self::get_template_course_modules_parameters(),
+            ['courseid' => $courseid]
+        );
 
         $course = $DB->get_record('course', ['id' => $params['courseid']], '*', MUST_EXIST);
         self::validate_course_access((int)$course->id);
@@ -256,8 +256,14 @@ class externalstuff extends external_api {
             $assignedrole = true;
 
             // Backup the activity.
-            $bc = new backup_controller(backup::TYPE_1ACTIVITY, $cm->id, backup::FORMAT_MOODLE,
-                backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id);
+            $bc = new backup_controller(
+                backup::TYPE_1ACTIVITY,
+                $cm->id,
+                backup::FORMAT_MOODLE,
+                backup::INTERACTIVE_NO,
+                backup::MODE_GENERAL,
+                $USER->id
+            );
 
             // Force excluding any user data.
             $settings = $bc->get_plan()->get_settings();
@@ -279,8 +285,14 @@ class externalstuff extends external_api {
             $assignedrole = false;
 
             // Restore the backup immediately.
-            $rc = new restore_controller($backupid, $targetcourseid,
-                backup::INTERACTIVE_NO, backup::MODE_GENERAL, $USER->id, backup::TARGET_CURRENT_ADDING);
+            $rc = new restore_controller(
+                $backupid,
+                $targetcourseid,
+                backup::INTERACTIVE_NO,
+                backup::MODE_GENERAL,
+                $USER->id,
+                backup::TARGET_CURRENT_ADDING
+            );
             $rc->set_status(backup::STATUS_AWAITING);
 
             $rc->execute_plan();
@@ -406,8 +418,10 @@ class externalstuff extends external_api {
      */
     public static function get_target_course_sections($courseid): array {
         global $DB;
-        $params = self::validate_parameters(self::get_target_course_sections_parameters(),
-            ['courseid' => $courseid]);
+        $params = self::validate_parameters(
+            self::get_target_course_sections_parameters(),
+            ['courseid' => $courseid]
+        );
 
         $course = $DB->get_record('course', ['id' => $params['courseid']], '*', MUST_EXIST);
         self::validate_course_access((int)$course->id);
