@@ -237,7 +237,7 @@ class externalstuff extends external_api {
         $coursecontext = null;
         $managerrole = null;
         $assignedrole = false;
-        $keeptempdirectoriesonbackup = $CFG->keeptempdirectoriesonbackup;
+        $keeptempdirectoriesonbackup = $CFG->keeptempdirectoriesonbackup ?? false;
 
         try {
             // Get course from sectionid.
