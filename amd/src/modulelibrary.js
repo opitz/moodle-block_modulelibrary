@@ -14,6 +14,9 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
     /** @type {number} Current course id */
     let currentCourseId = 0;
 
+    /** @type {boolean} Whether a copy request is in progress */
+    let copyInProgress = false;
+
     /**
      * Initializes the Module Library JS.
      * @param {Object} opts
@@ -53,6 +56,9 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
 
         // Cancel copy.
         $(document).on('click', '#cancel-copy-btn', function() {
+            if (copyInProgress) {
+                return;
+            }
             selectedModule = null;
             $('#modulelibrary-copy-form').empty();
         });
@@ -133,7 +139,23 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
             notification.exception(new Error('No template module selected'));
             return;
         }
+
+        if (copyInProgress) {
+            return;
+        }
+
         const targetsection = parseInt($('#target-section').val() || 0, 10);
+        const confirmButton = $('#confirm-copy-btn');
+        const cancelButton = $('#cancel-copy-btn');
+        const targetSectionSelect = $('#target-section');
+        const progressMessage = $('#copy-progress-message');
+        const originalButtonText = confirmButton.text();
+
+        copyInProgress = true;
+        confirmButton.prop('disabled', true).text('Copying...');
+        cancelButton.prop('disabled', true);
+        targetSectionSelect.prop('disabled', true);
+        progressMessage.removeClass('d-none');
 
         ajax.call([{
             methodname: 'block_modulelibrary_copy_activity',
@@ -147,11 +169,21 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
                 notification.addNotification({message: 'Module copied successfully', type: 'success'});
                 setTimeout(function() {
                     window.location.reload();
-                    }, 1200);
+                }, 1200);
             } else {
-                notification.exception(new Error('Copy failed'));
+                copyInProgress = false;
+                confirmButton.prop('disabled', false).text(originalButtonText);
+                cancelButton.prop('disabled', false);
+                targetSectionSelect.prop('disabled', false);
+                progressMessage.addClass('d-none');
+                notification.exception(new Error(response.message || 'Copy failed'));
             }
         }).fail(function(err) {
+            copyInProgress = false;
+            confirmButton.prop('disabled', false).text(originalButtonText);
+            cancelButton.prop('disabled', false);
+            targetSectionSelect.prop('disabled', false);
+            progressMessage.addClass('d-none');
             notification.exception(err);
         });
     }

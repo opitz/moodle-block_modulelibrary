@@ -49,8 +49,12 @@
             </select>
         </div>
 
+        <div id="copy-progress-message" class="alert alert-info d-none" role="status" aria-live="polite">
+            Copy in progress. Please wait…
+        </div>
+
         <div class="mb-3 d-flex justify-content-between mt-3">
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" id="confirm-copy-btn" class="btn btn-primary">
                 {{#str}} confirmcopy, block_modulelibrary {{/str}}
             </button>
             <button type="button" id="cancel-copy-btn" class="btn btn-secondary">
