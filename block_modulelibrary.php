@@ -29,7 +29,6 @@
  * Provides a block for managing and copying template modules.
  */
 class block_modulelibrary extends block_base {
-
     /**
      * Initialise the block title.
      *
