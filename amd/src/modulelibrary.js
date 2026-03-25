@@ -17,6 +17,9 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
     /** @type {boolean} Whether a copy request is in progress */
     let copyInProgress = false;
 
+    /** @type {string} localStorage key for selected template course */
+    const selectedCourseStorageKey = 'block_modulelibrary_selected_course';
+
     /**
      * Initializes the Module Library JS.
      * @param {Object} opts
@@ -25,6 +28,7 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
         opts = opts || {};
         currentCourseId = opts.currentCourseId || 0;
         bindEvents();
+        restoreSelectedTemplateCourse();
     };
 
     /**
@@ -35,8 +39,10 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
         $(document).on('change', '#modulelibrary-course-select', function() {
             const courseId = $(this).val();
             if (courseId) {
+                storeSelectedTemplateCourse(courseId);
                 loadTemplateCourseSections(courseId);
             } else {
+                clearSelectedTemplateCourse();
                 $('#modulelibrary-modules').empty();
                 $('#modulelibrary-copy-form').empty();
             }
@@ -65,8 +71,43 @@ define(['jquery', 'core/ajax', 'core/templates', 'core/notification'],
     }
 
     /**
+     * Store the selected template course.
+     *
+     * @param {string|number} courseId
+     */
+    function storeSelectedTemplateCourse(courseId) {
+        window.localStorage.setItem(selectedCourseStorageKey, String(courseId));
+    }
+
+    /**
+     * Clear the selected template course.
+     */
+    function clearSelectedTemplateCourse() {
+        window.localStorage.removeItem(selectedCourseStorageKey);
+    }
+
+    /**
+     * Restore the selected template course after page reloads.
+     */
+    function restoreSelectedTemplateCourse() {
+        const courseId = window.localStorage.getItem(selectedCourseStorageKey);
+        if (!courseId) {
+            return;
+        }
+
+        const courseSelect = $('#modulelibrary-course-select');
+        if (!courseSelect.find(`option[value="${courseId}"]`).length) {
+            clearSelectedTemplateCourse();
+            return;
+        }
+
+        courseSelect.val(courseId);
+        loadTemplateCourseSections(courseId);
+    }
+
+    /**
      * Load sections and modules from the template course.
-     * @param {number} courseId
+     * @param {number|string} courseId
      */
     function loadTemplateCourseSections(courseId) {
         const loading = document.querySelector('#modulelibrary-loading');
