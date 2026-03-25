@@ -43,23 +43,4 @@ class behat_block_modulelibrary extends behat_base {
         $categoryid = $DB->get_field('course_categories', 'id', ['name' => $categoryname], MUST_EXIST);
         set_config('templatecategory', $categoryid, 'block_modulelibrary');
     }
-
-    /**
-     * Confirm an activity is shown in a named course section.
-     *
-     * @Then /^I should see activity "(?P<activityname>[^"]*)" in section "(?P<sectionname>[^"]*)"$/
-     * @param string $activityname
-     * @param string $sectionname
-     * @return void
-     */
-    public function i_should_see_activity_in_section(string $activityname, string $sectionname): void {
-        $sectionxpath = "//li[contains(@class, 'section')]//*[contains(normalize-space(.), " .
-            $this->escape($sectionname) . ")]";
-        $activityxpath = "//li[contains(@class, 'section')][.//*[contains(normalize-space(.), " .
-            $this->escape($sectionname) . ")]]//*[contains(normalize-space(.), " .
-            $this->escape($activityname) . ")]";
-
-        $this->find('xpath', $sectionxpath);
-        $this->find('xpath', $activityxpath);
-    }
 }
