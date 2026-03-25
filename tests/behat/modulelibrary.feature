@@ -28,16 +28,34 @@ Feature: Copy modules from template courses using block_modulelibrary
     When I turn editing mode off
     Then I should not see "Select template course"
 
-  Scenario: Teacher can browse template courses and copy a module
+  Scenario: Teacher can browse template courses and copy modules
     Given I should see "Template Course A" in the "Select template course" "select"
     And I should see "Template Course B" in the "Select template course" "select"
+
     When I select "Template Course A" from the "Select template course" singleselect
     Then I should see "Test Quiz A"
     And I should see "Test Book A"
     And I should not see "Test Book B"
+
     When I press "Copy"
     And I select "Section 1" from the "target-section" singleselect
     And I press "Confirm copy"
     And I wait until the page is ready
     Then the field "Select template course" matches value "Template Course A"
-    And I should see activity "Test Quiz A" in section "Section 1"
+
+    When I turn editing mode off
+    And I turn editing mode on
+    And I wait until the page is ready
+
+    When I select "Template Course B" from the "Select template course" singleselect
+    And I should not see "Test Book A"
+    And I should see "Test Book B"
+    When I press "Copy"
+    And I select "Section 2" from the "target-section" singleselect
+    And I press "Confirm copy"
+    And I wait until the page is ready
+
+    When I turn editing mode off
+    Then I should not see "Select template course"
+    And I should see "Test Quiz A"
+    And I should see "Test Book B"
